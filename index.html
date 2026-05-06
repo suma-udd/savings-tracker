@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Stash – Savings Tracker</title>
+<meta name="theme-color" content="#6FCF3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --green: #6FCF3A;
+    --dark-green: #1A3A1A;
+    --light-green: #B8F07A;
+    --white: #FFFFFF;
+    --bg: #F5F5F5;
+    --text: #1A1A1A;
+    --text-muted: #888;
+    --card-bg: #FFFFFF;
+    --nav-bg: #FFFFFF;
+    --input-bg: #F5F5F5;
+    --border: #E8E8E8;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.12);
+    --radius: 20px;
+    --radius-sm: 12px;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  .dark {
+    --bg: #0F1A0F;
+    --text: #F0F0F0;
+    --text-muted: #666;
+    --card-bg: #1A2A1A;
+    --nav-bg: #1A2A1A;
+    --input-bg: #243024;
+    --border: #2A3A2A;
+    --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  #app {
+    position: relative;
+    width: 100%;
+    max-width: 390px;
+    height: 100vh;
+    margin: 0 auto;
+    overflow: hidden;
+    background: var(--bg);
+    transition: background 0.3s;
+  }
+
+  /* SCREENS */
+  .screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    background: var(--bg);
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .screen.active { transform: translateX(0); visibility: visible; pointer-events: auto; z-index: 2; }
+  .screen.prev { transform: translateX(-30%); }
+  .screen.splash { transform: translateX(0); background: var(--dark-green); }
+
+  /* SPLASH */
+  #splash {
+    background: var(--dark-green);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 40px 32px;
+    opacity: 0;
+    animation: fadeIn 0.8s ease forwards;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  .logo-mark {
+    width: 72px; height: 72px;
+    position: relative;
+    margin-bottom: 32px;
+  }
+  .logo-sq {
+    position: absolute;
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--green);
+  }
+  .logo-sq:nth-child(1) { top: 0; left: 0; opacity: 0.5; }
+  .logo-sq:nth-child(2) { bottom: 0; right: 0; background: var(--light-green); }
+  .logo-sq:nth-child(3) { top: 14px; left: 14px; background: var(--green); width: 44px; height: 44px; }
+
+  .splash-headline {
+    font-size: 36px;
+    font-weight: 800;
+    color: #fff;
+    text-align: center;
+    line-height: 1.15;
+    margin-bottom: 14px;
+    letter-spacing: -1px;
+  }
+  .splash-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.55);
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 64px;
+  }
+  .splash-actions { width: 100%; display: flex; flex-direction: column; gap: 14px; margin-top: auto; }
+
+  /* BUTTONS */
+  .btn {
+    border: none; cursor: pointer;
+    font-family: var(--font);
+    font-weight: 600;
+    font-size: 16px;
+    border-radius: 999px;
+    padding: 16px 32px;
+    transition: transform 0.1s, opacity 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn-primary { background: var(--green); color: var(--dark-green); }
+  .btn-dark { background: var(--dark-green); color: #fff; }
+  .btn-white { background: #fff; color: var(--dark-green); }
+  .btn-outline { background: transparent; border: 2px solid rgba(255,255,255,0.3); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--text-muted); font-weight: 500; text-decoration: underline; }
+  .btn-sm { padding: 10px 20px; font-size: 14px; }
+  .btn-full { width: 100%; }
+
+  /* ONBOARDING */
+  #onboarding {
+    background: var(--dark-green);
+    padding: 60px 32px 48px;
+    display: flex; flex-direction: column;
+  }
+  .onboard-step { display: none; flex-direction: column; flex: 1; }
+  .onboard-step.active { display: flex; }
+  .onboard-title { font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 10px; letter-spacing: -0.5px; }
+  .onboard-sub { font-size: 15px; color: rgba(255,255,255,0.5); margin-bottom: 32px; }
+  .onboard-input {
+    background: rgba(255,255,255,0.08);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 16px 18px;
+    font-family: var(--font);
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .onboard-input::placeholder { color: rgba(255,255,255,0.25); font-weight: 400; }
+  .onboard-input:focus { border-color: var(--green); }
+  .onboard-actions { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--nav-bg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+    transition: background 0.3s;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 4px; cursor: pointer; padding: 4px 0;
+    transition: transform 0.15s;
+  }
+  .nav-item:active { transform: scale(0.9); }
+  .nav-icon {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-icon svg { width: 22px; height: 22px; }
+  .nav-label { font-size: 11px; font-weight: 500; color: var(--text-muted); transition: color 0.2s; }
+  .nav-item.active .nav-label { color: var(--green); }
+  .nav-item.active .nav-icon svg { stroke: var(--green); }
+  .nav-item .nav-icon svg { stroke: var(--text-muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
+
+  /* SCROLL AREA */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 80px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* HOME */
+  .home-header {
+    padding: 56px 24px 24px;
+    background: var(--dark-green);
+    border-radius: 0 0 28px 28px;
+  }
+  .home-greeting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .home-greeting { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.7); }
+  .home-name { color: #fff; }
+  .bell-btn {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative; border: none;
+  }
+  .bell-btn svg { stroke: rgba(255,255,255,0.8); fill: none; stroke-width: 2; width: 20px; height: 20px; }
+  .bell-dot {
+    position: absolute; top: 8px; right: 8px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); border: 2px solid var(--dark-green);
+  }
+  .total-saved-label { font-size: 13px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .total-saved-row { display: flex; align-items: center; gap: 12px; }
+  .total-saved-amount { font-size: 44px; font-weight: 800; color: #fff; letter-spacing: -2px; font-family: var(--mono); }
+  .eye-btn { background: none; border: none; cursor: pointer; padding: 4px; }
+  .eye-btn svg { stroke: rgba(255,255,255,0.4); fill: none; stroke-width: 2; width: 22px; height: 22px; }
+
+  .section-header { padding: 20px 24px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .section-title { font-size: 17px; font-weight: 700; color: var(--text); }
+  .section-link { font-size: 13px; font-weight: 600; color: var(--green); cursor: pointer; }
+
+  /* GOAL CARDS */
+  .goals-scroll { overflow-x: auto; padding: 0 24px 8px; display: flex; gap: 14px; }
+  .goals-scroll::-webkit-scrollbar { display: none; }
+  .goal-card {
+    min-width: 220px;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transform: translateY(30px); opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s;
+    flex-shrink: 0;
+  }
+  .goal-card.visible { transform: translateY(0); opacity: 1; }
+  .goal-card:active { transform: scale(0.97) translateY(0); }
+  .goal-card-emoji { font-size: 28px; margin-bottom: 12px; }
+  .goal-card-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+  .goal-progress-bar { height: 6px; background: var(--input-bg); border-radius: 999px; margin-bottom: 10px; overflow: hidden; }
+  .goal-progress-fill { height: 100%; background: var(--green); border-radius: 999px; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .goal-card-amounts { display: flex; justify-content: space-between; align-items: center; }
+  .goal-saved { font-size: 13px; font-weight: 700; color: var(--text); font-family: var(--mono); }
+  .goal-days { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+  /* EMPTY STATE */
+  .empty-state { padding: 40px 24px; text-align: center; }
+  .empty-icon { font-size: 48px; margin-bottom: 14px; }
+  .empty-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 14px; color: var(--text-muted); }
+
+  /* FAB */
+  .fab {
+    position: absolute; bottom: 90px; right: 24px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--green); border: none; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(111, 207, 58, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 10;
+  }
+  .fab:active { transform: scale(0.92); box-shadow: 0 2px 10px rgba(111, 207, 58, 0.4); }
+  .fab svg { stroke: var(--dark-green); fill: none; stroke-width: 2.5; width: 24px; height: 24px; }
+
+  /* BOTTOM SHEET */
+  .sheet-backdrop {
+    position: absolute; inset: 0; z-index: 50;
+    background: rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .sheet-backdrop.open { opacity: 1; pointer-events: all; }
+  .bottom-sheet {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 51;
+    background: var(--card-bg);
+    border-radius: 24px 24px 0 0;
+    padding: 16px 24px 36px;
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .bottom-sheet.open { transform: translateY(0); }
+  .sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--border); margin: 0 auto 20px;
+  }
+  .sheet-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 24px; letter-spacing: -0.5px; }
+
+  /* FORM */
+  .form-group { margin-bottom: 16px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; display: block; }
+  .form-input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 2px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-family: var(--font); font-size: 15px; font-weight: 500;
+    color: var(--text); outline: none;
+    transition: border-color 0.2s, background 0.3s;
+  }
+  .form-input:focus { border-color: var(--green); background: var(--card-bg); }
+  .form-input::placeholder { color: var(--text-muted); }
+
+  /* PREVIEW CARD */
+  .preview-card {
+    background: var(--dark-green);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin: 20px 0;
+    transition: all 0.3s;
+  }
+  .preview-name { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+  .preview-progress { height: 6px; background: rgba(255,255,255,0.15); border-radius: 999px; margin-bottom: 10px; overflow: hidden; }
+  .preview-fill { height: 100%; background: var(--green); border-radius: 999px; transition: width 0.3s; }
+  .preview-amounts { display: flex; justify-content: space-between; }
+  .preview-saved { font-size: 13px; color: rgba(255,255,255,0.7); font-family: var(--mono); }
+  .preview-calc { font-size: 13px; color: var(--light-green); font-weight: 600; text-align: center; padding: 12px 16px; background: rgba(111,207,58,0.1); border-radius: var(--radius-sm); margin-bottom: 20px; }
+
+  /* GOAL DETAIL */
+  .detail-header {
+    padding: 56px 24px 20px;
+    background: var(--dark-green);
+    border-radius: 0 0 28px 28px;
+    display: flex; flex-direction: column;
+  }
+  .back-btn {
+    background: rgba(255,255,255,0.1); border: none; cursor: pointer;
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px; transition: transform 0.15s;
+  }
+  .back-btn:active { transform: scale(0.9); }
+  .back-btn svg { stroke: #fff; fill: none; stroke-width: 2.5; width: 18px; height: 18px; }
+  .detail-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+  .detail-subtitle { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+  /* RING */
+  .ring-container { display: flex; justify-content: center; padding: 32px 0 20px; }
+  .ring-wrap { position: relative; width: 180px; height: 180px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--input-bg); stroke-width: 12; }
+  .ring-fill { fill: none; stroke: var(--green); stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-pct { font-size: 32px; font-weight: 800; color: var(--text); letter-spacing: -1px; font-family: var(--mono); }
+  .ring-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+  .detail-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 24px; }
+  .stat-card { background: var(--card-bg); border-radius: var(--radius-sm); padding: 16px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .stat-value { font-size: 18px; font-weight: 700; color: var(--text); font-family: var(--mono); }
+  .stat-value.green { color: var(--green); }
+
+  /* DEPOSITS */
+  .deposit-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0; border-bottom: 1px solid var(--border);
+  }
+  .deposit-item:last-child { border-bottom: none; }
+  .deposit-date { font-size: 13px; color: var(--text-muted); }
+  .deposit-amount { font-size: 15px; font-weight: 700; color: var(--green); font-family: var(--mono); }
+
+  /* ANALYTICS */
+  .analytics-header { padding: 56px 24px 24px; background: var(--dark-green); border-radius: 0 0 28px 28px; }
+  .analytics-title { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+  .analytics-total { font-size: 40px; font-weight: 800; color: #fff; letter-spacing: -2px; font-family: var(--mono); margin-top: 6px; }
+  .chart-card { margin: 20px 24px; background: var(--card-bg); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .chart-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+  .goal-breakdown { padding: 0 24px; }
+  .breakdown-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .breakdown-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .breakdown-name { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); }
+  .breakdown-amount { font-size: 14px; font-weight: 700; color: var(--text); font-family: var(--mono); }
+
+  /* PROFILE */
+  .profile-header { padding: 56px 24px 32px; background: var(--dark-green); border-radius: 0 0 28px 28px; display: flex; flex-direction: column; align-items: center; }
+  .avatar { width: 80px; height: 80px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: var(--dark-green); margin-bottom: 14px; }
+  .profile-name { font-size: 22px; font-weight: 800; color: #fff; }
+  .profile-since { font-size: 13px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+  .settings-list { padding: 20px 24px; display: flex; flex-direction: column; gap: 2px; }
+  .settings-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px; background: var(--card-bg); border-radius: var(--radius-sm);
+    cursor: pointer; margin-bottom: 2px; transition: opacity 0.15s;
+  }
+  .settings-item:active { opacity: 0.7; }
+  .settings-item-left { display: flex; align-items: center; gap: 12px; }
+  .settings-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--input-bg); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .settings-label { font-size: 15px; font-weight: 600; color: var(--text); }
+  .settings-arrow svg { stroke: var(--text-muted); fill: none; stroke-width: 2; width: 16px; height: 16px; }
+  .toggle-switch { width: 44px; height: 24px; border-radius: 999px; background: var(--border); position: relative; cursor: pointer; transition: background 0.25s; }
+  .toggle-switch.on { background: var(--green); }
+  .toggle-thumb { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left 0.25s; }
+  .toggle-switch.on .toggle-thumb { left: 23px; }
+
+  /* MODAL */
+  .modal-overlay { position: absolute; inset: 0; z-index: 60; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; padding: 24px; }
+  .modal-overlay.open { display: flex; }
+  .modal-box { background: var(--card-bg); border-radius: var(--radius); padding: 28px 24px; width: 100%; max-width: 340px; animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes popIn { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+  .modal-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-cancel { flex: 1; padding: 12px; background: var(--input-bg); border: none; border-radius: 999px; font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+  .modal-confirm { flex: 1; padding: 12px; background: var(--green); border: none; border-radius: 999px; font-family: var(--font); font-size: 14px; font-weight: 700; color: var(--dark-green); cursor: pointer; }
+
+  /* TOAST */
+  .toast {
+    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--dark-green); color: #fff; font-size: 14px; font-weight: 600;
+    padding: 12px 24px; border-radius: 999px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s; z-index: 100; pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* CURRENCY SELECT */
+  .currency-opts { display: flex; gap: 8px; margin-top: 12px; }
+  .currency-opt { flex: 1; padding: 10px; background: var(--input-bg); border: 2px solid transparent; border-radius: var(--radius-sm); text-align: center; font-size: 16px; font-weight: 700; color: var(--text); cursor: pointer; }
+  .currency-opt.active { border-color: var(--green); color: var(--green); }
+
+  .name-edit-form { display: none; flex-direction: column; gap: 10px; }
+  .name-edit-form.visible { display: flex; }
+
+  /* COUNT UP */
+  .count-up { display: inline-block; }
+
+  /* DANGER */
+  .settings-item.danger .settings-label { color: #FF4444; }
+
+  @media (min-height: 800px) {
+    .splash-headline { font-size: 40px; }
+  }
+
+  /* NO GOALS */
+  .all-goals-list { padding: 0 24px; display: flex; flex-direction: column; gap: 12px; }
+  .all-goal-row {
+    background: var(--card-bg); border-radius: var(--radius); padding: 16px 20px;
+    box-shadow: var(--shadow); cursor: pointer;
+    display: flex; align-items: center; gap: 14px;
+    transform: translateY(20px); opacity: 0;
+    transition: transform 0.35s, opacity 0.35s;
+  }
+  .all-goal-row.visible { transform: translateY(0); opacity: 1; }
+  .all-goal-row:active { transform: scale(0.98) translateY(0); }
+  .all-goal-row-info { flex: 1; min-width: 0; }
+  .all-goal-row-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .all-goal-row-bar { height: 4px; background: var(--input-bg); border-radius: 999px; overflow: hidden; }
+  .all-goal-row-fill { height: 100%; background: var(--green); border-radius: 999px; }
+  .all-goal-row-pct { font-size: 13px; font-weight: 700; color: var(--green); font-family: var(--mono); flex-shrink: 0; }
+  .archive-row { opacity: 0.8; }
+  .archive-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--dark-green);
+    background: var(--light-green);
+    border-radius: 999px;
+    padding: 4px 8px;
+    flex-shrink: 0;
+  }
+
+  /* CELEBRATION */
+  .celebration-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 120;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .celebration-overlay.show { opacity: 1; }
+  .celebration-message {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    background: var(--green);
+    color: var(--dark-green);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.5px;
+    border-radius: 999px;
+    padding: 14px 24px;
+    box-shadow: var(--shadow-lg);
+    animation: popInVictory 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  @keyframes popInVictory {
+    to { transform: translateX(-50%) scale(1); }
+  }
+  .confetti {
+    position: absolute;
+    top: -10px;
+    width: 8px;
+    height: 14px;
+    border-radius: 2px;
+    opacity: 0.95;
+    animation: confettiFall 2.4s linear forwards;
+  }
+  @keyframes confettiFall {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SPLASH -->
+  <div id="splash" class="screen active">
+    <div class="logo-mark">
+      <div class="logo-sq"></div>
+      <div class="logo-sq"></div>
+      <div class="logo-sq"></div>
+    </div>
+    <h1 class="splash-headline">Track Your Goals,<br>Build Your Future</h1>
+    <p class="splash-sub">Save smarter. Hit your targets.<br>Watch your money grow.</p>
+    <div class="splash-actions">
+      <button class="btn btn-primary btn-full" onclick="goToOnboarding()">Get Started</button>
+      <button class="btn btn-ghost btn-full" onclick="loginSkip()">Already have an account? Login</button>
+    </div>
+  </div>
+
+  <!-- ONBOARDING -->
+  <div id="onboarding" class="screen">
+    <div class="onboard-step active" id="step1">
+      <div style="font-size:42px;margin-bottom:24px">👋</div>
+      <h2 class="onboard-title">What's your name?</h2>
+      <p class="onboard-sub">We'll personalise your experience</p>
+      <input class="onboard-input" id="nameInput" type="text" placeholder="Your name" autocomplete="off" maxlength="20">
+      <div class="onboard-actions" style="margin-top: 40px;">
+        <button class="btn btn-primary btn-full" onclick="onboardNext()">Continue →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <div id="home" class="screen">
+    <div class="home-header">
+      <div class="home-greeting-row">
+        <div>
+          <div class="home-greeting">Hi, <span class="home-name" id="homeName">there</span> 👋</div>
+        </div>
+        <button class="bell-btn">
+          <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <div class="bell-dot"></div>
+        </button>
+      </div>
+      <div class="total-saved-label">Total Saved</div>
+      <div class="total-saved-row">
+        <div class="total-saved-amount count-up" id="totalSaved">$0</div>
+        <button class="eye-btn" onclick="toggleHide()" id="eyeBtn">
+          <svg id="eyeIcon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="scroll-area" id="homeScroll">
+      <div class="section-header">
+        <span class="section-title">Active Goals</span>
+        <span class="section-link" onclick="navigate('goals')">See all</span>
+      </div>
+      <div class="goals-scroll" id="homeGoalCards"></div>
+      <div class="section-header" style="margin-top:8px;">
+        <span class="section-title">All Goals</span>
+      </div>
+      <div class="all-goals-list" id="homeAllGoals"></div>
+      <div class="empty-state" id="homeEmpty" style="display:none">
+        <div class="empty-icon">🎯</div>
+        <div class="empty-title">No goals yet</div>
+        <div class="empty-sub">Tap + to create your first savings goal</div>
+      </div>
+    </div>
+    <button class="fab" onclick="openAddGoal()">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <nav class="bottom-nav">
+      <div class="nav-item active" onclick="navigate('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" onclick="navigate('analytics')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg></div>
+        <span class="nav-label">Analytics</span>
+      </div>
+      <div class="nav-item" onclick="navigate('goals')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <span class="nav-label">Goals</span>
+      </div>
+      <div class="nav-item" onclick="navigate('profile')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <span class="nav-label">Profile</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- GOALS SCREEN -->
+  <div id="goals" class="screen">
+    <div class="home-header">
+      <div style="padding-top:4px"></div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Your Goals</div>
+      <div style="font-size:28px;font-weight:800;color:#fff;letter-spacing:-1px" id="goalsCount">0 Goals</div>
+    </div>
+    <div class="scroll-area" style="padding-top:16px">
+      <div class="all-goals-list" id="goalsList"></div>
+      <div class="empty-state" id="goalsEmpty" style="display:none">
+        <div class="empty-icon">🎯</div>
+        <div class="empty-title">No goals yet</div>
+        <div class="empty-sub">Tap + to create your first savings goal</div>
+        <button class="btn btn-primary btn-sm" style="margin:20px auto 0;display:flex" onclick="openAddGoal()">+ Add Goal</button>
+      </div>
+      <div class="section-header" style="margin-top:10px">
+        <span class="section-title">Completed Goals</span>
+      </div>
+      <div class="all-goals-list" id="archivedGoalsList"></div>
+      <div class="empty-state" id="archivedEmpty" style="display:none;padding-top:12px">
+        <div class="empty-sub">No completed goals yet</div>
+      </div>
+    </div>
+    <button class="fab" onclick="openAddGoal()">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="navigate('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" onclick="navigate('analytics')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg></div>
+        <span class="nav-label">Analytics</span>
+      </div>
+      <div class="nav-item active" onclick="navigate('goals')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <span class="nav-label">Goals</span>
+      </div>
+      <div class="nav-item" onclick="navigate('profile')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <span class="nav-label">Profile</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ANALYTICS SCREEN -->
+  <div id="analytics" class="screen">
+    <div class="analytics-header">
+      <div class="analytics-title">My Savings</div>
+      <div class="analytics-total count-up" id="analyticsTotalDisplay">$0</div>
+    </div>
+    <div class="scroll-area">
+      <div class="chart-card">
+        <div class="chart-title">Savings Growth</div>
+        <canvas id="savingsChart" height="160"></canvas>
+      </div>
+      <div class="section-header"><span class="section-title">Goal Breakdown</span></div>
+      <div class="goal-breakdown" id="goalBreakdown"></div>
+    </div>
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="navigate('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item active" onclick="navigate('analytics')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg></div>
+        <span class="nav-label">Analytics</span>
+      </div>
+      <div class="nav-item" onclick="navigate('goals')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <span class="nav-label">Goals</span>
+      </div>
+      <div class="nav-item" onclick="navigate('profile')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <span class="nav-label">Profile</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- PROFILE SCREEN -->
+  <div id="profile" class="screen">
+    <div class="profile-header">
+      <div class="avatar" id="profileAvatar">?</div>
+      <div class="profile-name" id="profileName">Loading...</div>
+      <div class="profile-since" id="profileSince">Member since today</div>
+    </div>
+    <div class="scroll-area">
+      <div class="settings-list">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;padding:8px 0 4px">Account</div>
+        <div class="settings-item" onclick="toggleNameEdit()">
+          <div class="settings-item-left"><div class="settings-icon">✏️</div><span class="settings-label">Edit Name</span></div>
+          <div class="settings-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+        <div id="nameEditForm" class="name-edit-form" style="padding:12px 0;gap:10px">
+          <input class="form-input" id="profileNameInput" type="text" placeholder="Your name" maxlength="20">
+          <button class="btn btn-primary btn-sm" onclick="saveName()">Save Name</button>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;padding:16px 0 4px">Preferences</div>
+        <div class="settings-item">
+          <div class="settings-item-left"><div class="settings-icon">💱</div><span class="settings-label">Currency</span></div>
+          <div class="currency-opts">
+            <div class="currency-opt active" id="cur-usd" onclick="setCurrency('$')">$</div>
+            <div class="currency-opt" id="cur-gbp" onclick="setCurrency('£')">£</div>
+            <div class="currency-opt" id="cur-eur" onclick="setCurrency('€')">€</div>
+          </div>
+        </div>
+        <div class="settings-item" onclick="toggleDark()">
+          <div class="settings-item-left"><div class="settings-icon">🌙</div><span class="settings-label">Dark Mode</span></div>
+          <div class="toggle-switch" id="darkToggle"><div class="toggle-thumb"></div></div>
+        </div>
+
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;padding:16px 0 4px">Data</div>
+        <div class="settings-item danger" onclick="confirmClearData()">
+          <div class="settings-item-left"><div class="settings-icon">🗑️</div><span class="settings-label">Clear All Data</span></div>
+          <div class="settings-arrow"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="navigate('home')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" onclick="navigate('analytics')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg></div>
+        <span class="nav-label">Analytics</span>
+      </div>
+      <div class="nav-item" onclick="navigate('goals')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+        <span class="nav-label">Goals</span>
+      </div>
+      <div class="nav-item active" onclick="navigate('profile')">
+        <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <span class="nav-label">Profile</span>
+      </div>
+    </nav>
+  </div>
+
+  <!-- GOAL DETAIL SCREEN -->
+  <div id="detail" class="screen">
+    <div class="detail-header">
+      <button class="back-btn" onclick="goBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="detail-title" id="detailTitle">Goal Name</div>
+      <div class="detail-subtitle" id="detailSubtitle">Loading...</div>
+    </div>
+    <div class="scroll-area">
+      <div class="ring-container">
+        <div class="ring-wrap">
+          <svg width="180" height="180" viewBox="0 0 180 180">
+            <circle class="ring-bg" cx="90" cy="90" r="78"/>
+            <circle class="ring-fill" id="ringFill" cx="90" cy="90" r="78" stroke-dasharray="490" stroke-dashoffset="490"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-pct" id="ringPct">0%</div>
+            <div class="ring-label">Complete</div>
+          </div>
+        </div>
+      </div>
+      <div class="detail-stats" id="detailStats"></div>
+      <div style="padding: 20px 24px 0">
+        <button class="btn btn-primary btn-full" onclick="openDeposit()">+ Log a Deposit</button>
+      </div>
+      <div class="section-header"><span class="section-title">Deposit History</span></div>
+      <div style="padding: 0 24px" id="depositHistory"></div>
+    </div>
+  </div>
+
+  <!-- ADD GOAL SHEET -->
+  <div class="sheet-backdrop" id="addBackdrop" onclick="closeAddGoal()"></div>
+  <div class="bottom-sheet" id="addSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">New Goal 🎯</div>
+    <div class="form-group">
+      <label class="form-label">Goal Name</label>
+      <input class="form-input" id="goalName" type="text" placeholder="e.g. New MacBook, Trip to Bali" maxlength="40">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target Amount</label>
+      <input class="form-input" id="goalTarget" type="number" placeholder="$2,000" min="1">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Already Saved (optional)</label>
+      <input class="form-input" id="goalSaved" type="number" placeholder="$0" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Deadline</label>
+      <input class="form-input" id="goalDeadline" type="date">
+    </div>
+    <div class="preview-card">
+      <div class="preview-name" id="previewName">Your Goal</div>
+      <div class="preview-progress"><div class="preview-fill" id="previewFill" style="width:0%"></div></div>
+      <div class="preview-amounts">
+        <span class="preview-saved" id="previewSaved">$0 saved</span>
+        <span style="font-size:13px;color:rgba(255,255,255,0.5)" id="previewTarget">of $0</span>
+      </div>
+    </div>
+    <div class="preview-calc" id="previewCalc">Fill in details above to see your weekly target</div>
+    <button class="btn btn-dark btn-full" onclick="createGoal()">Create Goal ✓</button>
+  </div>
+
+  <!-- DEPOSIT MODAL -->
+  <div class="modal-overlay" id="depositModal">
+    <div class="modal-box">
+      <div class="modal-title">Log a Deposit 💰</div>
+      <div class="modal-sub">How much are you adding?</div>
+      <input class="form-input" id="depositAmount" type="number" placeholder="$50" min="0.01" step="0.01">
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeDeposit()">Cancel</button>
+        <button class="modal-confirm" onclick="saveDeposit()">Add ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLEAR DATA MODAL -->
+  <div class="modal-overlay" id="clearModal">
+    <div class="modal-box">
+      <div class="modal-title">Clear All Data?</div>
+      <div class="modal-sub">This will delete all goals and deposits. This can't be undone.</div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeClearModal()">Cancel</button>
+        <button class="modal-confirm" style="background:#FF4444;color:#fff" onclick="clearAllData()">Delete All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+  <div class="celebration-overlay" id="celebrationOverlay">
+    <div class="celebration-message" id="celebrationMessage">YOU DID IT!</div>
+    <div id="confettiContainer"></div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────
+let state = {
+  user: { name: '', joinedDate: '', currency: '$', darkMode: false },
+  goals: [],
+  hideAmounts: false
+};
+
+let currentGoalId = null;
+let chartInstance = null;
+let lastMainScreen = 'home';
+const GOAL_COLORS = ['#6FCF3A','#B8F07A','#4CAF50','#2E7D32','#A5D6A7','#81C784','#66BB6A'];
+
+// ─── STORAGE ──────────────────────────────────────────────
+function save() { localStorage.setItem('stash_data', JSON.stringify(state)); }
+function load() {
+  const d = localStorage.getItem('stash_data');
+  if (!d) return;
+  try {
+    const parsed = JSON.parse(d);
+    state = {
+      user: {
+        name: parsed?.user?.name || '',
+        joinedDate: parsed?.user?.joinedDate || '',
+        currency: parsed?.user?.currency || '$',
+        darkMode: !!parsed?.user?.darkMode
+      },
+      goals: Array.isArray(parsed?.goals) ? parsed.goals.map(g => ({
+        ...g,
+        saved: Number(g?.saved) || 0,
+        target: Number(g?.target) || 0,
+        completedAt: g?.completedAt || ((Number(g?.target) > 0 && Number(g?.saved) >= Number(g?.target)) ? new Date().toISOString() : null)
+      })) : [],
+      hideAmounts: !!parsed?.hideAmounts
+    };
+  } catch (_) {
+    localStorage.removeItem('stash_data');
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+load();
+if (state.user.darkMode) document.getElementById('app').classList.add('dark');
+
+// Set tomorrow as min date for deadline
+const tmr = new Date(); tmr.setDate(tmr.getDate()+1);
+document.getElementById('goalDeadline').min = tmr.toISOString().split('T')[0];
+
+if (state.user.name) {
+  setTimeout(() => loginSkip(), 100);
+} else {
+  document.getElementById('splash').classList.add('active');
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────
+let currentScreen = 'home';
+const screenOrder = ['home','analytics','goals','profile'];
+
+function showScreen(id, direction='forward') {
+  const next = document.getElementById(id);
+  if (!next) return;
+
+  const active = document.querySelector('.screen.active');
+  if (active && active.id === id) return;
+
+  const screens = document.querySelectorAll('.screen');
+  screens.forEach(s => {
+    s.classList.remove('active','prev');
+    if (s.id !== id) {
+      s.style.transform = 'translateX(100%)';
+    }
+  });
+
+  if (direction === 'forward') {
+    next.style.transform = 'translateX(100%)';
+    requestAnimationFrame(() => {
+      next.style.transition = 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      next.style.transform = 'translateX(0)';
+    });
+  } else {
+    next.style.transform = 'translateX(-30%)';
+    requestAnimationFrame(() => {
+      next.style.transition = 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      next.style.transform = 'translateX(0)';
+    });
+  }
+  next.classList.add('active');
+}
+
+function navigate(id) {
+  if (!screenOrder.includes(id)) return;
+  if (id === currentScreen && document.getElementById(id)?.classList.contains('active')) return;
+  const ci = screenOrder.indexOf(currentScreen);
+  const ni = screenOrder.indexOf(id);
+  const dir = ni >= ci ? 'forward' : 'back';
+  currentScreen = id;
+  lastMainScreen = id;
+  showScreen(id, dir);
+  updateNavActive(id);
+  if (id === 'home') renderHome();
+  if (id === 'goals') renderGoals();
+  if (id === 'analytics') renderAnalytics();
+  if (id === 'profile') renderProfile();
+}
+
+function updateNavActive(id) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll(`#${id} .nav-item`).forEach((n, i) => {
+    const ids = ['home','analytics','goals','profile'];
+    if (n.getAttribute('onclick') === `navigate('${id}')`) n.classList.add('active');
+  });
+  // per screen
+  const screen = document.getElementById(id);
+  if (!screen) return;
+  screen.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') === `navigate('${id}')`) n.classList.add('active');
+    else n.classList.remove('active');
+  });
+}
+
+// ─── SPLASH / ONBOARDING ──────────────────────────────────
+function goToOnboarding() {
+  showScreen('onboarding', 'forward');
+}
+
+function onboardNext() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { showToast('Enter your name first 😄'); return; }
+  state.user.name = name;
+  state.user.joinedDate = new Date().toLocaleDateString('en-US', {month:'long', year:'numeric'});
+  save();
+  goHome();
+}
+
+function loginSkip() {
+  // already has data
+  goHome();
+}
+
+function goHome() {
+  currentScreen = 'home';
+  lastMainScreen = 'home';
+  document.querySelectorAll('.screen').forEach(s => {
+    s.style.transform = 'translateX(100%)';
+    s.classList.remove('active');
+  });
+  const homeEl = document.getElementById('home');
+  homeEl.style.transform = 'translateX(0)';
+  homeEl.classList.add('active');
+  renderHome();
+  updateNavActive('home');
+}
+
+function goBack() {
+  navigate(lastMainScreen);
+}
+
+// ─── HOME ─────────────────────────────────────────────────
+function renderHome() {
+  document.getElementById('homeName').textContent = state.user.name || 'there';
+  updateTotalDisplay();
+  renderHomeCards();
+}
+
+function updateTotalDisplay() {
+  const total = state.goals.reduce((s, g) => s + g.saved, 0);
+  const el = document.getElementById('totalSaved');
+  if (state.hideAmounts) { el.textContent = '••••••'; return; }
+  animateCount(el, total, state.user.currency);
+}
+
+function animateCount(el, target, symbol='$') {
+  const start = parseFloat(el.textContent.replace(/[^0-9.]/g,'')) || 0;
+  const dur = 600; const s = Date.now();
+  const tick = () => {
+    const p = Math.min((Date.now()-s)/dur, 1);
+    const ease = 1 - Math.pow(1-p, 3);
+    const v = start + (target-start)*ease;
+    el.textContent = symbol + formatMoney(v);
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function roundTo2(n) { return Math.round((Number(n) + Number.EPSILON) * 100) / 100; }
+function formatMoney(n) {
+  const v = roundTo2(n);
+  return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function getActiveGoals() { return state.goals.filter(g => !g.completedAt); }
+function getArchivedGoals() { return state.goals.filter(g => !!g.completedAt); }
+
+function toggleHide() {
+  state.hideAmounts = !state.hideAmounts;
+  const icon = document.getElementById('eyeIcon');
+  if (state.hideAmounts) {
+    icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    document.getElementById('totalSaved').textContent = '••••••';
+  } else {
+    icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    updateTotalDisplay();
+  }
+}
+
+function renderHomeCards() {
+  const activeGoals = getActiveGoals();
+  const container = document.getElementById('homeGoalCards');
+  const allList = document.getElementById('homeAllGoals');
+  const empty = document.getElementById('homeEmpty');
+  container.innerHTML = '';
+  allList.innerHTML = '';
+
+  if (activeGoals.length === 0) {
+    empty.style.display = 'block';
+    container.style.display = 'none';
+    allList.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  container.style.display = 'flex';
+  allList.style.display = 'flex';
+
+  activeGoals.forEach((g, i) => {
+    const pct = Math.min(100, (g.saved / g.target) * 100);
+    const days = Math.ceil((new Date(g.deadline) - new Date()) / 86400000);
+    const sym = state.user.currency;
+
+    // horizontal card
+    const card = document.createElement('div');
+    card.className = 'goal-card';
+    card.innerHTML = `
+      <div class="goal-card-emoji">${g.emoji||'🎯'}</div>
+      <div class="goal-card-name">${g.name}</div>
+      <div class="goal-progress-bar"><div class="goal-progress-fill" style="width:${pct}%"></div></div>
+      <div class="goal-card-amounts">
+        <span class="goal-saved">${sym}${g.saved.toFixed(0)}</span>
+        <span class="goal-days">${days > 0 ? days+'d left' : 'Overdue'}</span>
+      </div>`;
+    card.onclick = () => openDetail(g.id);
+    container.appendChild(card);
+    setTimeout(() => card.classList.add('visible'), i * 100);
+
+    // list row
+    const row = document.createElement('div');
+    row.className = 'all-goal-row';
+    row.innerHTML = `
+      <div style="font-size:24px">${g.emoji||'🎯'}</div>
+      <div class="all-goal-row-info">
+        <div class="all-goal-row-name">${g.name}</div>
+        <div class="all-goal-row-bar"><div class="all-goal-row-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="all-goal-row-pct">${pct.toFixed(0)}%</div>`;
+    row.onclick = () => openDetail(g.id);
+    allList.appendChild(row);
+    setTimeout(() => row.classList.add('visible'), 80 + i * 80);
+  });
+}
+
+// ─── GOALS SCREEN ─────────────────────────────────────────
+function renderGoals() {
+  const activeGoals = getActiveGoals();
+  const archivedGoals = getArchivedGoals();
+  const list = document.getElementById('goalsList');
+  const archivedList = document.getElementById('archivedGoalsList');
+  const empty = document.getElementById('goalsEmpty');
+  const archivedEmpty = document.getElementById('archivedEmpty');
+  document.getElementById('goalsCount').textContent = activeGoals.length + ' Active Goal' + (activeGoals.length !== 1 ? 's' : '');
+  list.innerHTML = '';
+  archivedList.innerHTML = '';
+
+  if (activeGoals.length === 0) { empty.style.display = 'block'; }
+  else empty.style.display = 'none';
+  const sym = state.user.currency;
+
+  activeGoals.forEach((g, i) => {
+    const pct = Math.min(100, (g.saved / g.target) * 100);
+    const days = Math.ceil((new Date(g.deadline) - new Date()) / 86400000);
+    const row = document.createElement('div');
+    row.className = 'all-goal-row';
+    row.innerHTML = `
+      <div style="font-size:26px">${g.emoji||'🎯'}</div>
+      <div class="all-goal-row-info">
+        <div class="all-goal-row-name">${g.name}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${sym}${g.saved.toFixed(0)} of ${sym}${g.target.toFixed(0)} • ${days > 0 ? days+'d left' : 'Overdue'}</div>
+        <div class="all-goal-row-bar"><div class="all-goal-row-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="all-goal-row-pct">${pct.toFixed(0)}%</div>`;
+    row.onclick = () => openDetail(g.id);
+    list.appendChild(row);
+    setTimeout(() => row.classList.add('visible'), i * 80);
+  });
+
+  if (archivedGoals.length === 0) {
+    archivedEmpty.style.display = 'block';
+    return;
+  }
+  archivedEmpty.style.display = 'none';
+
+  archivedGoals.forEach((g, i) => {
+    const completedOn = g.completedAt ? new Date(g.completedAt).toLocaleDateString() : 'Unknown';
+    const row = document.createElement('div');
+    row.className = 'all-goal-row archive-row';
+    row.innerHTML = `
+      <div style="font-size:26px">${g.emoji||'🎯'}</div>
+      <div class="all-goal-row-info">
+        <div class="all-goal-row-name">${g.name}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Completed on ${completedOn}</div>
+        <div class="all-goal-row-bar"><div class="all-goal-row-fill" style="width:100%"></div></div>
+      </div>
+      <div class="archive-badge">DONE</div>`;
+    row.onclick = () => openDetail(g.id);
+    archivedList.appendChild(row);
+    setTimeout(() => row.classList.add('visible'), i * 80);
+  });
+}
+
+// ─── ADD GOAL ─────────────────────────────────────────────
+const EMOJIS = ['🎯','✈️','🏠','💻','🚗','📱','🎓','💎','🌴','🎸','👟','🏋️','📷','🎮','💰'];
+
+function openAddGoal() {
+  document.getElementById('addBackdrop').classList.add('open');
+  document.getElementById('addSheet').classList.add('open');
+  document.getElementById('goalName').value = '';
+  document.getElementById('goalTarget').value = '';
+  document.getElementById('goalSaved').value = '';
+  document.getElementById('goalDeadline').value = '';
+  updatePreview();
+}
+
+function closeAddGoal() {
+  document.getElementById('addBackdrop').classList.remove('open');
+  document.getElementById('addSheet').classList.remove('open');
+}
+
+['goalName','goalTarget','goalSaved','goalDeadline'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePreview);
+});
+
+function updatePreview() {
+  const name = document.getElementById('goalName').value || 'Your Goal';
+  const target = parseFloat(document.getElementById('goalTarget').value) || 0;
+  const saved = parseFloat(document.getElementById('goalSaved').value) || 0;
+  const deadline = document.getElementById('goalDeadline').value;
+  const sym = state.user.currency;
+
+  document.getElementById('previewName').textContent = name;
+  document.getElementById('previewSaved').textContent = `${sym}${saved.toFixed(0)} saved`;
+  document.getElementById('previewTarget').textContent = `of ${sym}${target.toFixed(0)}`;
+
+  const pct = target > 0 ? Math.min(100, (saved/target)*100) : 0;
+  document.getElementById('previewFill').style.width = pct + '%';
+
+  if (target > 0 && deadline) {
+    const weeks = Math.ceil((new Date(deadline) - new Date()) / (7*86400000));
+    const remaining = Math.max(0, target - saved);
+    const perWeek = weeks > 0 ? (remaining / weeks).toFixed(2) : remaining.toFixed(2);
+    document.getElementById('previewCalc').textContent = `💡 Save ${sym}${perWeek}/week to hit this goal`;
+  } else {
+    document.getElementById('previewCalc').textContent = 'Fill in details above to see your weekly target';
+  }
+}
+
+function createGoal() {
+  const name = document.getElementById('goalName').value.trim();
+  const target = parseFloat(document.getElementById('goalTarget').value);
+  const saved = parseFloat(document.getElementById('goalSaved').value) || 0;
+  const deadline = document.getElementById('goalDeadline').value;
+
+  if (!name) { showToast('Give your goal a name! 📝'); return; }
+  if (!target || target <= 0) { showToast('Set a target amount 💰'); return; }
+  if (!deadline) { showToast('Pick a deadline 📅'); return; }
+  if (new Date(deadline) <= new Date()) { showToast("Deadline can't be in the past ⏰"); return; }
+  if (saved > target) { showToast("Saved amount can't exceed target 🤔"); return; }
+
+  const nowIso = new Date().toISOString();
+  const completedAt = saved >= target ? nowIso : null;
+  const goal = {
+    id: Date.now().toString(),
+    name, target, saved, deadline,
+    emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+    deposits: saved > 0 ? [{
+      date: new Date().toLocaleDateString(),
+      isoDate: nowIso,
+      amount: saved
+    }] : [],
+    createdAt: nowIso,
+    completedAt
+  };
+
+  state.goals.push(goal);
+  save();
+  closeAddGoal();
+  renderHome();
+  showToast(`${goal.emoji} "${name}" created!`);
+}
+
+// ─── GOAL DETAIL ──────────────────────────────────────────
+function openDetail(id) {
+  currentGoalId = id;
+  const g = state.goals.find(x => x.id === id);
+  if (!g) return;
+
+  const pct = Math.min(100, (g.saved / g.target) * 100);
+  const days = Math.ceil((new Date(g.deadline) - new Date()) / 86400000);
+  const sym = state.user.currency;
+  const circ = 2 * Math.PI * 78;
+  const weeks = Math.max(1, Math.ceil((new Date(g.deadline) - new Date()) / (7*86400000)));
+  const perWeek = Math.max(0, (g.target - g.saved) / weeks).toFixed(2);
+
+  document.getElementById('detailTitle').textContent = `${g.emoji} ${g.name}`;
+  document.getElementById('detailSubtitle').textContent = `${days > 0 ? days + ' days left' : 'Deadline passed'}`;
+  document.getElementById('ringPct').textContent = pct.toFixed(0) + '%';
+
+  const ring = document.getElementById('ringFill');
+  ring.style.strokeDashoffset = circ;
+  setTimeout(() => {
+    ring.style.strokeDashoffset = circ - (pct / 100) * circ;
+  }, 100);
+
+  document.getElementById('detailStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Saved</div><div class="stat-value green">${sym}${formatMoney(g.saved)}</div></div>
+    <div class="stat-card"><div class="stat-label">Target</div><div class="stat-value">${sym}${formatMoney(g.target)}</div></div>
+    <div class="stat-card"><div class="stat-label">Days Left</div><div class="stat-value">${days > 0 ? days : 'Over'}</div></div>
+    <div class="stat-card"><div class="stat-label">Weekly Target</div><div class="stat-value green">${sym}${perWeek}</div></div>`;
+
+  renderDepositHistory(g);
+
+  if (screenOrder.includes(currentScreen)) lastMainScreen = currentScreen;
+  showScreen('detail', 'forward');
+}
+
+function renderDepositHistory(g) {
+  const container = document.getElementById('depositHistory');
+  const sym = state.user.currency;
+  if (!g.deposits || g.deposits.length === 0) {
+    container.innerHTML = '<div style="padding:16px 0;color:var(--text-muted);font-size:14px">No deposits yet</div>';
+    return;
+  }
+  container.innerHTML = [...g.deposits].reverse().map(d => `
+    <div class="deposit-item">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">Deposit</div>
+        <div class="deposit-date">${formatDepositDate(d)}</div>
+      </div>
+      <div class="deposit-amount">+${sym}${parseFloat(d.amount).toFixed(2)}</div>
+    </div>`).join('');
+}
+
+// ─── DEPOSIT ──────────────────────────────────────────────
+function openDeposit() {
+  document.getElementById('depositAmount').value = '';
+  document.getElementById('depositModal').classList.add('open');
+}
+function closeDeposit() { document.getElementById('depositModal').classList.remove('open'); }
+
+function saveDeposit() {
+  const amount = parseFloat(document.getElementById('depositAmount').value);
+  if (!amount || amount <= 0) { showToast('Enter a valid amount 💸'); return; }
+  const g = state.goals.find(x => x.id === currentGoalId);
+  if (!g) return;
+
+  const remaining = g.target - g.saved;
+  if (remaining <= 0) { showToast('Goal already completed ✅'); closeDeposit(); return; }
+  const appliedAmount = Math.min(amount, remaining);
+
+  g.saved = roundTo2(g.saved + appliedAmount);
+  g.deposits = g.deposits || [];
+  g.deposits.push({
+    date: new Date().toLocaleDateString(),
+    isoDate: new Date().toISOString(),
+    amount: appliedAmount
+  });
+  const justCompleted = g.saved >= g.target && !g.completedAt;
+  if (justCompleted) g.completedAt = new Date().toISOString();
+  save();
+  closeDeposit();
+  openDetail(currentGoalId);
+  if (amount > appliedAmount) {
+    showToast(`Added ${state.user.currency}${formatMoney(appliedAmount)} (goal max reached)`);
+  } else {
+    showToast(`+${state.user.currency}${formatMoney(appliedAmount)} logged! 🎉`);
+  }
+  if (justCompleted) {
+    showGoalCelebration(g);
+    renderHome();
+    renderGoals();
+    renderAnalytics();
+  }
+}
+
+// ─── ANALYTICS ────────────────────────────────────────────
+function renderAnalytics() {
+  const sym = state.user.currency;
+  const total = state.goals.reduce((s, g) => s + g.saved, 0);
+  animateCount(document.getElementById('analyticsTotalDisplay'), total, sym);
+
+  // build chart data from all deposits
+  const dateMap = {};
+  state.goals.forEach(g => {
+    (g.deposits || []).forEach(d => {
+      const ts = getDepositTimestamp(d);
+      if (!ts) return;
+      dateMap[ts] = roundTo2((dateMap[ts] || 0) + parseFloat(d.amount));
+    });
+  });
+
+  let labels = [], values = [], cumulative = 0;
+  const sorted = Object.keys(dateMap).map(Number).sort((a,b) => a - b);
+  if (sorted.length === 0) {
+    labels = ['Now']; values = [0];
+  } else {
+    sorted.forEach(k => {
+      cumulative = roundTo2(cumulative + dateMap[k]);
+      labels.push(new Date(k).toLocaleDateString());
+      values.push(cumulative);
+    });
+  }
+
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById('savingsChart').getContext('2d');
+  const isDark = state.user.darkMode;
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#6FCF3A',
+        backgroundColor: isDark ? 'rgba(111,207,58,0.1)' : 'rgba(111,207,58,0.15)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#6FCF3A',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#888', font: { size: 11 } } },
+        y: {
+          grid: { color: isDark ? '#2A3A2A' : '#F0F0F0' },
+          ticks: {
+            color: '#888',
+            font: { size: 11 },
+            callback: v => sym + formatMoney(v)
+          }
+        }
+      },
+      animation: { duration: 800, easing: 'easeOutQuart' }
+    }
+  });
+
+  // breakdown
+  const breakdown = document.getElementById('goalBreakdown');
+  if (state.goals.length === 0) {
+    breakdown.innerHTML = '<div style="padding:16px 0;color:var(--text-muted);font-size:14px">No goals yet</div>';
+    return;
+  }
+  breakdown.innerHTML = state.goals.map((g, i) => `
+    <div class="breakdown-item">
+      <div class="breakdown-dot" style="background:${GOAL_COLORS[i % GOAL_COLORS.length]}"></div>
+      <span class="breakdown-name">${g.emoji} ${g.name}</span>
+      <span class="breakdown-amount">${sym}${formatMoney(g.saved)}</span>
+    </div>`).join('');
+}
+
+// ─── PROFILE ──────────────────────────────────────────────
+function renderProfile() {
+  const name = state.user.name || 'You';
+  document.getElementById('profileName').textContent = name;
+  document.getElementById('profileSince').textContent = 'Member since ' + (state.user.joinedDate || 'today');
+  document.getElementById('profileAvatar').textContent = name.substring(0,2).toUpperCase();
+  document.getElementById('profileNameInput').value = name;
+
+  const d = document.getElementById('darkToggle');
+  if (state.user.darkMode) d.classList.add('on'); else d.classList.remove('on');
+
+  ['usd','gbp','eur'].forEach(c => document.getElementById('cur-'+c).classList.remove('active'));
+  const map = {'$':'usd','£':'gbp','€':'eur'};
+  document.getElementById('cur-' + (map[state.user.currency]||'usd')).classList.add('active');
+}
+
+function toggleNameEdit() {
+  const f = document.getElementById('nameEditForm');
+  f.classList.toggle('visible');
+}
+
+function saveName() {
+  const name = document.getElementById('profileNameInput').value.trim();
+  if (!name) { showToast('Name cannot be empty'); return; }
+  state.user.name = name;
+  save();
+  renderProfile();
+  document.getElementById('nameEditForm').classList.remove('visible');
+  showToast('Name updated ✓');
+}
+
+function setCurrency(sym) {
+  state.user.currency = sym;
+  save();
+  renderProfile();
+  showToast('Currency updated to ' + sym);
+}
+
+function toggleDark() {
+  state.user.darkMode = !state.user.darkMode;
+  document.getElementById('app').classList.toggle('dark', state.user.darkMode);
+  save();
+  renderProfile();
+}
+
+function confirmClearData() { document.getElementById('clearModal').classList.add('open'); }
+function closeClearModal() { document.getElementById('clearModal').classList.remove('open'); }
+function clearAllData() {
+  const joined = state.user.joinedDate;
+  state.goals = [];
+  state.user.joinedDate = joined;
+  save();
+  closeClearModal();
+  renderHome();
+  renderGoals();
+  showToast('All data cleared');
+}
+
+function getDepositTimestamp(deposit) {
+  if (!deposit) return 0;
+  if (deposit.isoDate) {
+    const isoTs = Date.parse(deposit.isoDate);
+    if (!Number.isNaN(isoTs)) return isoTs;
+  }
+  if (deposit.date) {
+    const dateTs = Date.parse(deposit.date);
+    if (!Number.isNaN(dateTs)) return dateTs;
+  }
+  return 0;
+}
+
+function formatDepositDate(deposit) {
+  const ts = getDepositTimestamp(deposit);
+  if (!ts) return 'Unknown date';
+  return new Date(ts).toLocaleDateString();
+}
+
+function showGoalCelebration(goal) {
+  const overlay = document.getElementById('celebrationOverlay');
+  const message = document.getElementById('celebrationMessage');
+  const container = document.getElementById('confettiContainer');
+  if (!overlay || !message || !container) return;
+
+  message.textContent = `YOU DID IT! ${goal.emoji || '🎉'}`;
+  container.innerHTML = '';
+  const colors = ['#6FCF3A', '#B8F07A', '#FFFFFF', '#4CAF50', '#FFC107'];
+
+  for (let i = 0; i < 90; i += 1) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = `${Math.random() * 0.6}s`;
+    piece.style.animationDuration = `${2 + Math.random() * 1.4}s`;
+    container.appendChild(piece);
+  }
+
+  overlay.classList.add('show');
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    container.innerHTML = '';
+  }, 2600);
+}
+
+// ─── TOAST ────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── PWA SERVICE WORKER ───────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
